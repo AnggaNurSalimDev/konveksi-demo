@@ -249,7 +249,7 @@ Setiap request tulis **atomik**: semua berubah atau tidak sama sekali.
 | Peran | Perangkat | Isi |
 |---|---|---|
 | Owner | desktop | Ringkasan (order berjalan, terancam telat, selisih, upah menunggu final), tabel order, selisih per pekerja, reject per penyebab, upah per periode, tarif per model |
-| Admin | desktop | Detail order per tahap, catat serah terima, daftar menunggu konfirmasi + koreksi, setoran + QC, jejak serah terima, terbitkan spesifikasi |
+| Admin | desktop | Detail order: **alur panah per tahap** (Potong → … → Kirim, bisa diklik). Di bawahnya panel tahap terpilih: barang siap dibagikan di admin, tabel "dipegang oleh" (diterima, disetor, di tangan, status selisih) dengan tombol **Terima setoran** di baris tiap orang, tombol **Serahkan ke…**, dan daftar yang belum dikonfirmasi + koreksi. Lalu spesifikasi, link pembeli, kerja ulang, jejak lengkap (dilipat) |
 | Pekerja | HP | Konfirmasi terima (Sesuai / Tidak sesuai), pekerjaan saya, reject + penyebab, upah periode berjalan |
 | Pembeli | HP, tanpa login | Status per tahap, perkiraan selesai, lembar spesifikasi + tombol setujui/minta ubah, riwayat versi, (tahap 2) formulir ukuran |
 
@@ -280,7 +280,7 @@ Pertanyaan terbuka (dijawab oleh klien pertama):
 6. Apakah pembeli benar-benar membuka link status?
 7. Potongan yang dikembalikan pekerja **sebelum dikerjakan** (dipindah ke pekerja lain): belum ada alurnya. Setoran tahap QC selalu berupa barang jadi (lolos/reject).
 8. Admin salah ketik di setoran: setoran tidak bisa dikoreksi (4.2). Perlu aturan tambahan bila ini sering terjadi.
-9. Apakah jumlah yang diserahkan admin perlu dibatasi oleh stok potongan yang ada di admin? Saat ini tidak dibatasi.
+9. Apakah jumlah yang diserahkan admin perlu dibatasi oleh stok potongan yang ada di admin? Saat ini hanya **ditampilkan** ("siap dibagikan" = keluaran tahap sebelumnya − yang sudah dibagikan), tidak dibatasi.
 
 ---
 

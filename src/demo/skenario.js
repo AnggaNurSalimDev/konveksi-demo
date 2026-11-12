@@ -12,7 +12,7 @@ export const SKENARIO = [
       { ke: { admin: true }, teks: 'Admin membuka tab “+ Order baru”. Isi order ORD-040: pilih model, jumlah 100, harga, deadline, dan ukuran yang totalnya 100 (contoh S:20, M:40, L:40). Tekan “Buat order”.' },
       { teks: 'Order langsung terbuka. Di kartu “Link pembeli”, tekan “Buka sebagai pembeli”. Link ini yang dikirim ke pembeli lewat WA.' },
       { teks: 'Sebagai pembeli: tinjau lembar spesifikasi versi 1, lalu tekan “Setujui versi 1”. Di panel server terlihat produksi kini mengikuti versi 1.' },
-      { ke: { admin: true }, teks: 'Kembali ke admin: buka ORD-040, catat serah terima tahap Potong ke Dedi. Statusnya MENUNGGU sampai Dedi mengonfirmasi.' },
+      { ke: { admin: true }, teks: 'Kembali ke admin: buka ORD-040, klik panah Potong, lalu “+ Serahkan ke…” Dedi. Barisnya menunggu sampai Dedi mengonfirmasi dari HP-nya.' },
     ],
   },
   {
@@ -21,7 +21,7 @@ export const SKENARIO = [
     langkah: [
       { ke: { owner: true }, teks: 'Dashboard owner: “Selisih perlu dicek” menunjukkan Budi, ORD-031, 5 pcs. Budi menerima 100, setoran terakhirnya 95 (92 lolos + 3 reject).' },
       { ke: { pekerja: 'u-budi' }, teks: 'Di HP Budi terlihat angka yang sama: ORD-031 “Perlu dicek”, di tangan Budi 5 pcs. Tidak ada yang bisa membantah angka ini.' },
-      { ke: { admin: true }, teks: 'Ternyata 5 pcs tertinggal di rumah Budi. Admin membuka ORD-031 → Setoran + QC: tahap Jahit, dari Budi, lolos 5. Simpan.' },
+      { ke: { admin: true }, teks: 'Ternyata 5 pcs tertinggal di rumah Budi. Admin membuka ORD-031 → panah Jahit (bertanda “selisih”) → baris Budi → “Terima setoran”, isi lolos 5, simpan.' },
       { ke: { owner: true }, teks: 'Selisih Budi hilang dari dashboard. Coba juga menyetor 6 pcs: sistem menolak karena melebihi yang tercatat di tangan Budi.' },
     ],
   },
@@ -50,7 +50,7 @@ export const SKENARIO = [
     judul: 'Deadline terancam',
     langkah: [
       { ke: { owner: true }, teks: 'ORD-029 (500 kaos) berstatus “Terancam telat”: baru 40% lolos QC dengan laju sekitar 29 pcs per hari, padahal deadline 16 Nov.' },
-      { ke: { admin: true }, teks: 'Masih ada 100 potongan ORD-029 di admin. Buka ORD-029 → Catat serah terima: Jahit ke Budi 100 pcs.' },
+      { ke: { admin: true }, teks: 'Panel tahap Jahit ORD-029 menunjukkan 100 potongan masih siap dibagikan di admin. Tekan “+ Serahkan ke…”, pilih Budi, 100 pcs.' },
       { ke: { pekerja: 'u-budi' }, teks: 'HP Budi: tekan “Sesuai, 100 pcs”.' },
       { ke: { pembeli: 'ORD-029' }, teks: 'Pembeli melihat status dan perkiraan selesai sendiri, tanpa harus bertanya lewat WA.' },
     ],
@@ -59,9 +59,9 @@ export const SKENARIO = [
     kode: 'F',
     judul: 'Salah catat lalu dikoreksi',
     langkah: [
-      { ke: { admin: true }, teks: 'Admin membuka ORD-029 → Catat serah terima: Jahit ke Ani, ketik 210 pcs (salah ketik, seharusnya 100).' },
+      { ke: { admin: true }, teks: 'Admin membuka ORD-029 → panah Jahit → “+ Serahkan ke…” Ani, ketik 210 pcs (salah ketik, seharusnya 100).' },
       { ke: { pekerja: 'u-ani' }, teks: 'HP Ani: tekan “Tidak sesuai”, tulis “Yang saya terima 100 pcs”, kirim.' },
-      { ke: { admin: true }, teks: 'Tab “Menunggu konfirmasi”: baris 210 ditolak Ani. Tekan “Koreksi jumlah”, isi 100, alasan “salah ketik”.' },
+      { ke: { admin: true }, teks: 'Kembali ke ORD-029 → panah Jahit: di “Belum dikonfirmasi penerima”, baris 210 ditolak Ani. Tekan “Koreksi jumlah”, isi 100, alasan “salah ketik”.' },
       { ke: { pekerja: 'u-ani' }, teks: 'HP Ani: koreksi 100 pcs muncul. Tekan “Sesuai”. Di jejak ORD-029, baris 210 tetap ada dengan status “Dikoreksi”.' },
     ],
   },

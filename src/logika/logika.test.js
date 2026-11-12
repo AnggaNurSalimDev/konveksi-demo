@@ -7,7 +7,7 @@ import { hitungSelisih } from './selisih.js';
 import { validasiSetoran } from './setoran.js';
 import { rincianUpah, validasiFinalisasi, validasiKerjaUlang, validasiKeputusanKerjaUlang, tarifBerlaku } from './upah.js';
 import { validasiOrderBaru } from './order.js';
-import { kejadianLolos, progresOrder, statusDeadline, validasiPengiriman } from './progres.js';
+import { kejadianLolos, progresOrder, statusDeadline, validasiPengiriman, stokSiapDibagikan, keluaranTahap } from './progres.js';
 import { validasiVersiBaru, validasiPersetujuan, versiDisetujuiTerakhir, statusVersi } from './spesifikasi.js';
 
 // ---------- bantuan: "database" kecil di memori, meniru cara mock menambah baris ----------
@@ -441,6 +441,28 @@ describe('progres dan pengiriman', () => {
     expect(progres).toEqual({ lolos: 282, dikirim: 0, jumlah: 300, persen: 94 });
     expect(kodeGalat(() => validasiPengiriman({ order, pcs: 283, progres }))).toBe('KONFLIK');
     expect(validasiPengiriman({ order, pcs: 282, progres })).toEqual({ orderId: 'o31', pcs: 282 });
+  });
+});
+
+describe('stok siap dibagikan per tahap', () => {
+  it('tahap pertama dari jumlah order; tahap berikutnya dari keluaran tahap sebelumnya; DITOLAK tidak dihitung', () => {
+    const t = buatDb();
+    const order = t.db.order[0]; // POTONG → SABLON → JAHIT → KIRIM, 300 pcs
+    expect(stokSiapDibagikan(order, 'POTONG', t.db.serahTerima, t.idx())).toEqual({ masuk: 300, keluar: 0, siap: 300 });
+
+    const p = t.keluar({ orderId: 'o31', tahap: 'POTONG', keId: 'u-dedi', pcs: 300 });
+    t.konfirmasi(p.id, 'u-dedi', 'DITERIMA');
+    t.setor({ orderId: 'o31', tahap: 'POTONG', dariId: 'u-dedi', pcs: 300 });
+    const s = t.keluar({ orderId: 'o31', tahap: 'SABLON', keId: 'u-sablon', pcs: 300 });
+    t.konfirmasi(s.id, 'u-admin', 'DITERIMA');
+    t.setor({ orderId: 'o31', tahap: 'SABLON', dariId: 'u-sablon', pcs: 300 });
+
+    const salah = t.keluar({ orderId: 'o31', tahap: 'JAHIT', keId: 'u-ani', pcs: 210 });
+    t.konfirmasi(salah.id, 'u-ani', 'DITOLAK', 'cuma 200');
+    t.keluar({ orderId: 'o31', tahap: 'JAHIT', keId: 'u-budi', pcs: 100 }); // menunggu: sudah dianggap keluar
+    expect(stokSiapDibagikan(order, 'JAHIT', t.db.serahTerima, t.idx())).toEqual({ masuk: 300, keluar: 100, siap: 200 });
+    expect(keluaranTahap(order, 'SABLON', t.db.serahTerima, t.idx())).toBe(300);
+    expect(() => stokSiapDibagikan(order, 'KIRIM', t.db.serahTerima, t.idx())).toThrow(/Invarian/);
   });
 });
 

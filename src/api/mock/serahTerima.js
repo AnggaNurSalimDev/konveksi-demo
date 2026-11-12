@@ -13,6 +13,29 @@ function spekBerlaku(ctx, orderId) {
   return versiDisetujuiTerakhir(orderId, ctx.st.versiSpek, ctx.st.persetujuanSpek)?.id ?? null;
 }
 
+/** Baris KELUAR yang belum sah (MENUNGGU/DITOLAK), terbaru dulu. `saring(b)` membatasi barisnya. */
+export function daftarMenunggu(ctx, idx, saring = () => true) {
+  return ctx.st.serahTerima
+    .filter((b) => b.arah === 'KELUAR' && saring(b))
+    .map((b) => ({ b, status: statusSerahTerima(b, idx) }))
+    .filter(({ status }) => status === 'MENUNGGU' || status === 'DITOLAK')
+    .map(({ b, status }) => ({
+      id: b.id,
+      orderId: b.orderId,
+      kode: ctx.st.order.find((o) => o.id === b.orderId)?.kode,
+      tahap: b.tahap,
+      keId: b.keId,
+      ke: ctx.nama(b.keId),
+      keVendor: ctx.penggunaById.get(b.keId)?.peran === 'VENDOR',
+      pcs: b.pcs,
+      status,
+      koreksi: b.koreksiDariId !== null,
+      alasanTolak: idx.konfirmasiPer.get(b.id)?.alasan ?? null,
+      dibuatPada: b.dibuatPada,
+    }))
+    .sort((a, b) => b.dibuatPada - a.dibuatPada);
+}
+
 export const rute = [
   {
     metode: 'POST',
@@ -73,24 +96,7 @@ export const rute = [
     pola: '/serah-terima/menunggu',
     handler: (ctx) => {
       ctx.izin(AKSI.LIHAT_SEMUA_ORDER);
-      const idx = ctx.idx();
-      return ctx.st.serahTerima
-        .filter((b) => b.arah === 'KELUAR')
-        .map((b) => ({ b, status: statusSerahTerima(b, idx) }))
-        .filter(({ status }) => status === 'MENUNGGU' || status === 'DITOLAK')
-        .map(({ b, status }) => ({
-          id: b.id,
-          orderId: b.orderId,
-          kode: ctx.st.order.find((o) => o.id === b.orderId)?.kode,
-          tahap: b.tahap,
-          ke: ctx.nama(b.keId),
-          keVendor: ctx.penggunaById.get(b.keId)?.peran === 'VENDOR',
-          pcs: b.pcs,
-          status,
-          alasanTolak: idx.konfirmasiPer.get(b.id)?.alasan ?? null,
-          dibuatPada: b.dibuatPada,
-        }))
-        .sort((a, b) => b.dibuatPada - a.dibuatPada);
+      return daftarMenunggu(ctx, ctx.idx());
     },
   },
 ];

@@ -1,7 +1,7 @@
 // Progres, pengiriman, dan status deadline per order (rancangan 4.4).
 //   pengiriman { id, orderId, pcs, oleh, pada }
 
-import { STATUS_SERAH_TERIMA as S } from './konstanta.js';
+import { STATUS_SERAH_TERIMA as S, TAHAP_QC } from './konstanta.js';
 import { galatKonflik, invarian } from './galat.js';
 import { pastikanPcs } from './angka.js';
 import { HARI } from './waktu.js';
@@ -26,6 +26,39 @@ export function kejadianLolos(order, serahTerima, idx) {
     if (qc.lolos > 0) hasil.push({ pada: b.dibuatPada, lolos: qc.lolos });
   }
   return hasil.sort((a, b) => a.pada - b.pada);
+}
+
+/**
+ * Barang yang sudah selesai di satu tahap (dari setoran SAH): tahap QC = lolos, tahap lain = pcs disetor.
+ */
+export function keluaranTahap(order, tahap, serahTerima, idx) {
+  invarian(order.tahapan.includes(tahap), `order ${order.id} tidak memakai tahap ${tahap}`);
+  let n = 0;
+  for (const b of serahTerima) {
+    if (b.orderId !== order.id || b.arah !== 'SETOR' || b.tahap !== tahap || statusSerahTerima(b, idx) !== S.SAH) continue;
+    const qc = idx.qcPer.get(b.id);
+    n += TAHAP_QC.includes(tahap) ? (invarian(qc, `setoran ${b.id} tanpa QC`), qc.lolos) : b.pcs;
+  }
+  return n;
+}
+
+/**
+ * Perkiraan barang yang ada di admin dan siap dibagikan untuk sebuah tahap (bantuan tampilan, tidak membatasi):
+ *   masuk  = jumlah order (tahap pertama) atau keluaran tahap sebelumnya
+ *   keluar = Σ serah terima KELUAR tahap ini yang SAH atau masih MENUNGGU
+ *   siap   = masuk − keluar   (negatif = lebih banyak dibagikan daripada yang tercatat masuk)
+ */
+export function stokSiapDibagikan(order, tahap, serahTerima, idx) {
+  const i = order.tahapan.indexOf(tahap);
+  invarian(i >= 0 && tahap !== 'KIRIM', `tahap ${tahap} tidak bisa dibagikan untuk order ${order.id}`);
+  const masuk = i === 0 ? order.jumlah : keluaranTahap(order, order.tahapan.at(i - 1), serahTerima, idx);
+  let keluar = 0;
+  for (const b of serahTerima) {
+    if (b.orderId !== order.id || b.arah !== 'KELUAR' || b.tahap !== tahap) continue;
+    const s = statusSerahTerima(b, idx);
+    if (s === S.SAH || s === S.MENUNGGU) keluar += b.pcs;
+  }
+  return { masuk, keluar, siap: masuk - keluar };
 }
 
 export function progresOrder(order, kejadian, pengiriman) {

@@ -30,8 +30,18 @@ describe('tampilan demo', () => {
     fireEvent.click(pil('Admin'));
     expect(await screen.findByText('Rina')).toBeTruthy();
     fireEvent.click(await screen.findByRole('button', { name: 'ORD-031' }));
-    expect(await screen.findByText(/Jejak serah terima/)).toBeTruthy();
-    expect(screen.getAllByText(/setoran terakhir/).length).toBeGreaterThan(0);
+    expect(await screen.findByText(/Jejak lengkap serah terima/)).toBeTruthy();
+    // Panah tahap: Jahit terpilih (tahap sekarang), Budi selisih 5 → terima setoran 5 dari barisnya
+    expect(screen.getByRole('tab', { name: /Jahit/ }).getAttribute('aria-selected')).toBe('true');
+    const barisBudi = screen.getByText('Budi', { selector: 'strong' }).closest('tr');
+    expect(within(barisBudi).getByText('Perlu dicek')).toBeTruthy();
+    fireEvent.click(within(barisBudi).getByRole('button', { name: 'Terima setoran' }));
+    fireEvent.change(screen.getByLabelText('Lolos QC'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Simpan setoran' }));
+    expect(await screen.findByText(/Setoran Budi 5 pcs dicatat. Sisa di tangan Budi: 0 pcs./)).toBeTruthy();
+    // Panah Potong: semua beres, tidak ada yang bisa disetor
+    fireEvent.click(screen.getByRole('tab', { name: /Potong/ }));
+    expect(await screen.findByText('Tahap Potong')).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: 'Menunggu konfirmasi' }));
     expect(await screen.findByText(/ORD-033 · Potong · ke Dedi/)).toBeTruthy();
     fireEvent.click(screen.getByRole('tab', { name: '+ Order baru' }));

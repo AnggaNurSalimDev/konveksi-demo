@@ -127,3 +127,22 @@ legend { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 
 .spek > strong { text-align: right; }
 .berubah { display: inline-block; font-size: 11px; font-weight: 700; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 1px 7px; margin-left: 6px; }
 .titik { width: 12px; height: 12px; border-radius: 6px; flex: none; display: inline-block; }
+
+/* ---------- alur tahap (panah) di halaman admin ---------- */
+.alur { display: flex; overflow-x: auto; background: #f0f0ec; padding: 10px; gap: 0; border-bottom: 1px solid var(--line); }
+.alur button {
+  flex: 1 0 140px; position: relative; margin-left: -6px; padding: 12px 26px 12px 30px; min-height: 64px;
+  border: 0; background: #fff; color: var(--ink-2); cursor: pointer; text-align: left;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%);
+}
+.alur button:first-child { margin-left: 0; padding-left: 16px; clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%); }
+.alur button:hover { background: #f7f7f4; }
+.alur button.selesai { background: var(--ok-bg); color: var(--ok); }
+.alur button.sekarang { background: var(--accent-soft); color: var(--accent-ink); }
+.alur button.dipilih { background: var(--accent); color: #fff; }
+.alur button:focus-visible { outline: none; text-decoration: underline; text-underline-offset: 3px; filter: brightness(0.95); }
+.alur-nama { font-weight: 700; font-size: 14px; }
+.alur-angka { font-size: 12px; font-variant-numeric: tabular-nums; }
+.alur-tanda { font-size: 11px; font-weight: 700; align-self: flex-start; background: var(--warn-bg); color: var(--warn); border-radius: 999px; padding: 1px 7px; }
+.alur button.dipilih .alur-tanda { background: #fff; }

@@ -3,9 +3,42 @@
 import { AKSI } from '../../logika/wewenang.js';
 import { validasiOrderBaru } from '../../logika/order.js';
 import { validasiVersiBaru, statusVersi, versiOrder } from '../../logika/spesifikasi.js';
-import { kejadianLolos, progresOrder, validasiPengiriman } from '../../logika/progres.js';
+import { kejadianLolos, progresOrder, validasiPengiriman, stokSiapDibagikan } from '../../logika/progres.js';
 import { statusSerahTerima } from '../../logika/serahTerima.js';
+import { hitungSelisih } from '../../logika/selisih.js';
+import { TAHAP_QC } from '../../logika/konstanta.js';
 import { cariOrder, ringkasanOrder, tokenAcak } from './bantu.js';
+import { daftarMenunggu } from './serahTerima.js';
+
+/**
+ * Isi panel per tahap di halaman admin: barang siap dibagikan, siapa memegang berapa, dan yang belum dikonfirmasi.
+ * Pemegang = pekerja/vendor dengan serah terima SAH di tahap itu, ditambah yang baru punya serah terima menunggu.
+ */
+export function panelTahap(ctx, order, idx) {
+  const selisih = hitungSelisih(ctx.st.serahTerima, idx).filter((r) => r.orderId === order.id);
+  const menunggu = daftarMenunggu(ctx, idx, (b) => b.orderId === order.id);
+  return order.tahapan
+    .filter((t) => t !== 'KIRIM')
+    .map((tahap) => {
+      const menungguTahap = menunggu.filter((m) => m.tahap === tahap);
+      const baris = new Map(
+        selisih
+          .filter((r) => r.tahap === tahap)
+          .map((r) => [r.pekerjaId, { pekerjaId: r.pekerjaId, diterima: r.diterima, disetor: r.disetor, diTangan: r.selisih, status: r.status, adaSetoranTerakhir: r.adaSetoranTerakhir }]),
+      );
+      for (const m of menungguTahap) {
+        if (!baris.has(m.keId)) baris.set(m.keId, { pekerjaId: m.keId, diterima: 0, disetor: 0, diTangan: 0, status: null, adaSetoranTerakhir: false });
+      }
+      const pemegang = [...baris.values()]
+        .map((r) => {
+          const p = ctx.penggunaById.get(r.pekerjaId);
+          const pcsMenunggu = menungguTahap.filter((m) => m.keId === r.pekerjaId && m.status === 'MENUNGGU').reduce((a, m) => a + m.pcs, 0);
+          return { ...r, nama: p?.nama ?? '?', vendor: p?.peran === 'VENDOR', pcsMenunggu };
+        })
+        .sort((a, b) => a.nama.localeCompare(b.nama));
+      return { tahap, pakaiQc: TAHAP_QC.includes(tahap), stok: stokSiapDibagikan(order, tahap, ctx.st.serahTerima, idx), pemegang, menunggu: menungguTahap };
+    });
+}
 
 export function jejakOrder(ctx, order, idx) {
   return ctx.st.serahTerima
@@ -73,6 +106,7 @@ export const rute = [
         ...ringkasanOrder(ctx.st, order, idx, ctx.sekarang),
         hargaPerPcs: order.hargaPerPcs,
         jejak: jejakOrder(ctx, order, idx),
+        panelTahap: panelTahap(ctx, order, idx),
         versi: versiOrder(ctx.st.versiSpek, order.id).map((v) => ({ ...v, status: statusVersi(v, ctx.st.versiSpek, ctx.st.persetujuanSpek) })),
         tokenPembeli: link?.token ?? null,
         pengiriman: ctx.st.pengiriman.filter((p) => p.orderId === order.id),
