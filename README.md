@@ -2,7 +2,7 @@
 
 Sistem lacak produksi untuk **konveksi menengah**: setiap perpindahan barang antar tahap dicatat dan dikonfirmasi dua pihak, sehingga owner tahu posisi setiap order, ke mana pcs yang hilang, dan berapa upah borongan yang adil, tanpa menghitung manual.
 
-> **Demo:** _(isi tautan Vercel setelah deploy)_ · data contoh di browser, tanpa login sungguhan · pilih peran di bar atas.
+> **Demo:** [konveksi-demo.vercel.app](https://konveksi-demo.vercel.app) · data contoh di browser, tanpa login sungguhan · pilih peran di bar atas.
 
 ## Masalah yang diselesaikan
 
