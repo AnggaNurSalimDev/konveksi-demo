@@ -98,31 +98,44 @@ export function buatDataDemo() {
   terima(keluar(o31, 'JAHIT', 'u-budi', 100), 'u-budi');
   terima(keluar(o30, 'JAHIT', 'u-budi', 80), 'u-budi');
 
-  // --- 5–11 Nov: ORD-029 disetor sedikit demi sedikit (laju ±29/hari → terancam) ---
+  // --- 5–11 Nov, berurutan menurut waktu (jam demo hanya bisa maju) ---
+  // ORD-029 disetor sedikit demi sedikit tiap pukul 14.00 (laju ±29/hari → terancam).
   const harian = [[15, 13], [15, 13], [15, 13], [15, 13], [15, 14], [15, 14], [15, 15]];
-  harian.forEach(([ani, dedi], i) => {
+  const setor29 = (i) => {
+    const [ani, dedi] = harian.at(i);
     jam(5 + i, 14);
     setor({ orderId: o29, tahap: 'JAHIT', dariId: 'u-ani', lolos: ani });
     setor({ orderId: o29, tahap: 'JAHIT', dariId: 'u-dedi', lolos: dedi, ...(i === 2 && { reject: [{ penyebab: 'BAHAN', pcs: 2 }] }) });
-  });
+  };
+  for (let i = 0; i <= 3; i++) setor29(i); // 5–8 Nov
 
-  // --- ORD-030: jahit selesai, finishing jalan ---
+  // 8 Nov sore: ORD-030 jahit selesai, finishing jalan
   jam(8, 15);
   setor({ orderId: o30, tahap: 'JAHIT', dariId: 'u-budi', lolos: 80, terakhir: true });
   terima(keluar(o30, 'FINISHING', 'u-dedi', 80), 'u-dedi');
 
-  // --- 10 Nov: ORD-031 jahit selesai (skenario B dan C) ---
+  for (let i = 4; i <= 5; i++) setor29(i); // 9–10 Nov
+
+  // 10 Nov sore: ORD-031 jahit selesai (skenario B dan C), finishing ORD-030 sebagian
   jam(10, 15);
   setor({ orderId: o31, tahap: 'JAHIT', dariId: 'u-ani', lolos: 190, reject: [{ penyebab: 'POTONG', pcs: 10 }], terakhir: true });
   setor({ orderId: o31, tahap: 'JAHIT', dariId: 'u-budi', lolos: 92, reject: [{ penyebab: 'JAHIT', pcs: 3 }], terakhir: true });
   setor({ orderId: o30, tahap: 'FINISHING', dariId: 'u-dedi', lolos: 72 });
 
-  // --- 11 Nov: pembeli ORD-030 minta logo emas → versi 2 menunggu; ORD-033 mulai dipotong ---
+  // 11 Nov pagi: pembeli ORD-030 minta logo emas → versi 2 menunggu; ORD-033 mulai dipotong
   jam(11, 10);
   const d30 = panggil(ADMIN, `/order/${o30}`);
   admin(`/order/${o30}/spesifikasi`, { isi: { ...d30.versi.at(-1).isi, logo: 'Bordir dada kiri, emas' } });
   keluar(o33, 'POTONG', 'u-dedi', 120);
+
+  setor29(6); // 11 Nov 14.00
   jam(11, 16);
+
+  // Invarian: riwayat harus tercatat urut waktu (jam demo tidak pernah mundur).
+  const st = api.keadaan();
+  st.serahTerima.forEach((b, i) => {
+    if (i > 0 && b.dibuatPada < st.serahTerima.at(i - 1).dibuatPada) throw new Error(`Data contoh tidak urut waktu di ${b.id}`);
+  });
 
   const hasil = api.keadaan();
   hasil.log = []; // log riwayat pembuatan data tidak ditampilkan
