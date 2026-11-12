@@ -245,12 +245,15 @@ describe('skenario B: pcs hilang di penjahit', () => {
     const b = t.keluar({ orderId: 'o31', tahap: 'JAHIT', keId: 'u-budi', pcs: 100 });
     t.konfirmasi(b.id, 'u-budi', 'DITERIMA');
 
-    t.setor({ orderId: 'o31', tahap: 'JAHIT', dariId: 'u-budi', lolos: 92, reject: [{ penyebab: 'JAHIT', pcs: 3 }] });
-    expect(t.selisih('u-budi')).toMatchObject({ diterima: 100, disetor: 95, selisih: 5 });
+    t.setor({ orderId: 'o31', tahap: 'JAHIT', dariId: 'u-budi', lolos: 50 });
+    expect(t.selisih('u-budi')).toMatchObject({ selisih: 50, status: 'DIKERJAKAN' }); // masih dijahit, bukan hilang
+
+    t.setor({ orderId: 'o31', tahap: 'JAHIT', dariId: 'u-budi', lolos: 42, reject: [{ penyebab: 'JAHIT', pcs: 3 }], terakhir: true });
+    expect(t.selisih('u-budi')).toMatchObject({ diterima: 100, disetor: 95, selisih: 5, status: 'PERLU_DICEK' });
 
     expect(kodeGalat(() => t.setor({ orderId: 'o31', tahap: 'JAHIT', dariId: 'u-budi', lolos: 6 }))).toBe('KONFLIK');
     t.setor({ orderId: 'o31', tahap: 'JAHIT', dariId: 'u-budi', lolos: 5 });
-    expect(t.selisih('u-budi')).toMatchObject({ disetor: 100, selisih: 0 });
+    expect(t.selisih('u-budi')).toMatchObject({ disetor: 100, selisih: 0, status: 'BERES' });
   });
 
   it('tidak bisa menyetor pcs yang belum dikonfirmasi diterima', () => {

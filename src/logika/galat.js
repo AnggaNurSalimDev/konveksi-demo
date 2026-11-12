@@ -6,6 +6,7 @@ export const KODE = Object.freeze({
   TIDAK_BOLEH: 'TIDAK_BOLEH',
   TIDAK_DITEMUKAN: 'TIDAK_DITEMUKAN',
   KONFLIK: 'KONFLIK',
+  TIDAK_MASUK: 'TIDAK_MASUK',
 });
 
 export class GalatLogika extends Error {

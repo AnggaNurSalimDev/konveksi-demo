@@ -33,9 +33,11 @@ export function validasiSetoran({ data, admin, penggunaById, orderById, serahTer
     orderById,
   });
 
+  if (data.terakhir !== undefined && typeof data.terakhir !== 'boolean') throw galatValidasi('Tanda setoran terakhir harus ya/tidak');
+
   const sisa = sisaDiTangan({ pekerjaId: baris.dariId, orderId: baris.orderId, tahap: baris.tahap }, serahTerima, idx);
   if (pcs > sisa) {
     throw galatKonflik(`Setoran ${pcs} pcs melebihi pcs yang tercatat di tangan pekerja (${Math.max(sisa, 0)} pcs)`);
   }
-  return { baris, qc: qc && { lolos: qc.lolos, reject: qc.reject } };
+  return { baris: { ...baris, terakhir: data.terakhir === true }, qc: qc && { lolos: qc.lolos, reject: qc.reject } };
 }

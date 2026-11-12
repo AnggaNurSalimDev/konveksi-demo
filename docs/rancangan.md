@@ -112,7 +112,11 @@ selisih(P,O,T)  = diterima − disetor
 
 Contoh (skenario B): diterima 100, disetor 95 (92 lolos + 3 reject) → selisih 5.
 
-- Selisih > 0 = pcs masih di tangan pekerja atau hilang. Selisih < 0 = salah catat; tampil sebagai peringatan.
+- Selisih > 0 bisa berarti barang **masih dikerjakan**, bukan hilang. Karena itu setoran punya tanda `terakhir` (diisi admin: "ini setoran terakhir pekerja ini untuk order+tahap ini"). Status selisih:
+  - `DIKERJAKAN`: selisih > 0 dan belum ada setoran terakhir
+  - `PERLU_DICEK`: setoran terakhir sudah masuk tetapi selisih ≠ 0, atau selisih < 0 (salah catat)
+  - `BERES`: selisih 0
+- Dashboard owner hanya menyorot `PERLU_DICEK`. Setoran susulan setelah setoran terakhir tetap boleh.
 - Selisih ditampilkan, **tidak** otomatis memotong upah. Tindak lanjutnya keputusan owner.
 
 Upah pekerja P untuk periode X:
@@ -124,7 +128,7 @@ upah       = Σ pcsDibayar × tarif model order tsb yang berlaku pada tanggal se
 ```
 
 - Untuk tahap FINISHING, penyebab yang mengecualikan upah adalah `FINISHING` (bukan `JAHIT`). Aturan umum: reject tidak dibayar hanya bila penyebabnya **tahap yang dikerjakan pekerja itu sendiri**.
-- Tarif per model berversi (`tarif_versi { modelId, tahap, rupiahPerPcs, berlakuMulai }`); perubahan tarif tidak mengubah upah periode lalu.
+- Tarif per model berversi (`tarif_versi { modelId, tahap, rupiahPerPcs, berlakuMulai }`); perubahan tarif tidak mengubah upah periode lalu. Tarif baru tidak boleh berlaku mundur sebelum hari ini.
 - Periode upah: default 2 mingguan (1–15, 16–akhir bulan). **Hipotesis**, perlu dicek ke klien.
 - Tarif yang belum diatur tidak dianggap Rp 0 diam-diam: baris itu ditandai `tarifKosong`, dan finalisasi ditolak sampai tarifnya diatur.
 - Finalisasi hanya bisa dilakukan **setelah periode berakhir**, sekali per pekerja per periode, dan ditolak bila masih ada serah terima ke pekerja itu di periode tersebut yang belum dikonfirmasi.
@@ -216,7 +220,10 @@ gagal  : { "error": { "kode": "VALIDASI|TIDAK_BOLEH|TIDAK_DITEMUKAN|KONFLIK|TIDA
 | POST | `/serah-terima` | ADMIN | `{orderId, tahap, dariId, keId, pcs}`; pcs bulat > 0; status awal MENUNGGU |
 | POST | `/serah-terima/:id/koreksi` | ADMIN | `{pcs, alasan}`; hanya untuk baris MENUNGGU/DITOLAK/SAH yang belum dikoreksi |
 | POST | `/serah-terima/:id/konfirmasi` | PEKERJA penerima | `{hasil, alasan?}`; hanya baris MENUNGGU yang `keId` = dirinya; `alasan` wajib bila DITOLAK |
-| POST | `/setoran` | ADMIN | setor + QC sekaligus: `{orderId, tahap, dariId, lolos, reject:[{penyebab,pcs}]}`; tolak bila setor membuat disetor > diterima |
+| POST | `/setoran` | ADMIN | tahap QC: `{orderId, tahap, dariId, lolos, reject:[{penyebab,pcs}], terakhir?}`; tahap lain: `{…, pcs}`; tolak bila setor membuat disetor > diterima |
+| GET | `/serah-terima/menunggu` | OWNER, ADMIN | baris keluar MENUNGGU/DITOLAK (untuk koreksi dan konfirmasi vendor) |
+| GET | `/ringkasan` | OWNER, ADMIN | angka dashboard: order berjalan, terancam, selisih perlu dicek, reject 7 hari per penyebab, upah periode lalu belum final |
+| GET | `/model`, `/pengguna`, `/tarif`, `/kerja-ulang` | OWNER, ADMIN | data pendukung form |
 | GET | `/selisih` | OWNER (semua), PEKERJA (miliknya) | selisih per pekerja/order/tahap |
 | GET | `/upah?periode=` | OWNER (semua), PEKERJA (miliknya) | rincian per setoran |
 | POST | `/upah/:periode/finalisasi` | OWNER | `{pekerjaId}`; tolak bila periode belum selesai, sudah difinalkan, ada tarif kosong, atau masih ada serah terima MENUNGGU milik pekerja itu di periode tsb |
@@ -271,6 +278,9 @@ Pertanyaan terbuka (dijawab oleh klien pertama):
 4. Rumus "terancam telat" yang masuk akal untuk kecepatan produksi mereka.
 5. Bagaimana serah terima ke vendor luar dicatat di dunia nyata?
 6. Apakah pembeli benar-benar membuka link status?
+7. Potongan yang dikembalikan pekerja **sebelum dikerjakan** (dipindah ke pekerja lain): belum ada alurnya. Setoran tahap QC selalu berupa barang jadi (lolos/reject).
+8. Admin salah ketik di setoran: setoran tidak bisa dikoreksi (4.2). Perlu aturan tambahan bila ini sering terjadi.
+9. Apakah jumlah yang diserahkan admin perlu dibatasi oleh stok potongan yang ada di admin? Saat ini tidak dibatasi.
 
 ---
 
@@ -281,8 +291,9 @@ Tujuan: **promosi**. Pengunjung harus bisa mencoba semua peran dan melihat kenap
 ### 11.1 Teknologi
 
 - React + Vite, JavaScript. Tanpa backend; deploy Vercel.
-- Tes: Vitest untuk `logika/` dan mock API.
-- Validasi body: skema (zod) di `skema/`, dipakai juga oleh backend asli nanti.
+- Tes: Vitest untuk `logika/`, kontrak mock API, dan tes asap tampilan (jsdom).
+- Validasi body ada di fungsi `validasi…()` di `logika/` (tanpa pustaka skema), dipakai juga oleh backend asli nanti.
+- Demo menyimpan token link pembeli apa adanya; sistem asli menyimpan hash-nya (4.6).
 
 ### 11.2 Struktur
 
@@ -328,12 +339,12 @@ src/
 ### 11.5 Urutan pengerjaan
 
 1. ✅ `logika/` + tes (status serah terima, selisih, upah, progres, deadline, wewenang, spesifikasi, order).
-2. Mock API + tes kontrak per endpoint.
-3. Halaman admin (sumber data semua halaman lain).
-4. Halaman pekerja.
-5. Halaman owner.
-6. Halaman pembeli.
-7. Fitur demo: bar peran, panel server, jam demo, skenario terpandu.
-8. Deploy Vercel, README dengan tautan demo.
+2. ✅ Mock API + tes kontrak. Data contoh dibangun lewat mock API sendiri, jadi ikut semua aturan.
+3. ✅ Halaman admin.
+4. ✅ Halaman pekerja.
+5. ✅ Halaman owner.
+6. ✅ Halaman pembeli.
+7. ✅ Fitur demo: bar peran, panel server, jam demo, skenario terpandu A–F.
+8. Deploy Vercel (siap: `vercel.json`), lalu isi tautan demo di README.
 
 Tahap 2 (margin, biaya bahan, formulir ukuran) dibangun setelah tahap 1 selesai dan diuji.

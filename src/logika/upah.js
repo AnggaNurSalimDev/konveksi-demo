@@ -12,7 +12,7 @@
 import { MAKS_RUPIAH, STATUS_SERAH_TERIMA as S, TAHAP_QC } from './konstanta.js';
 import { galatKonflik, galatTidakDitemukan, galatValidasi, invarian } from './galat.js';
 import { pastikanPcs, pastikanSalahSatu, pastikanTeks } from './angka.js';
-import { dalamPeriode, pastikanWaktu, rentangPeriode } from './waktu.js';
+import { awalHariWib, dalamPeriode, pastikanWaktu, rentangPeriode } from './waktu.js';
 import { statusSerahTerima } from './serahTerima.js';
 import { pisahReject } from './qc.js';
 
@@ -27,13 +27,15 @@ export function tarifBerlaku(tarifVersi, { modelId, tahap, pada }) {
   return pilih;
 }
 
-export function validasiTarifBaru({ data, modelById }) {
+/** Tarif baru tidak boleh berlaku mundur sebelum hari ini (supaya upah yang sudah tercatat tidak berubah). */
+export function validasiTarifBaru({ data, modelById, sekarang }) {
   if (!data || typeof data !== 'object') throw galatValidasi('Data tarif kosong');
   if (!modelById.has(data.modelId)) throw galatTidakDitemukan('Model produk');
   const tahap = pastikanSalahSatu(data.tahap, TAHAP_QC, 'Tahap tarif');
   const rupiah = data.rupiahPerPcs;
   if (!Number.isInteger(rupiah) || rupiah < 1 || rupiah > MAKS_RUPIAH) throw galatValidasi('Tarif harus rupiah bulat lebih dari 0');
   const berlakuMulai = pastikanWaktu(data.berlakuMulai, 'Tanggal berlaku');
+  if (berlakuMulai < awalHariWib(sekarang)) throw galatValidasi('Tarif tidak boleh berlaku mundur sebelum hari ini');
   return { modelId: data.modelId, tahap, rupiahPerPcs: rupiah, berlakuMulai };
 }
 

@@ -51,6 +51,11 @@ export function rentangPeriode(periode) {
   return { mulai: wib(tahun, bulan, 16), selesai: wib(tahun, bulan + 1, 1) };
 }
 
+export function periodeSebelum(periode) {
+  const { mulai } = rentangPeriode(periode);
+  return periodeUpah(mulai - 1);
+}
+
 export function dalamPeriode(ms, periode) {
   const { mulai, selesai } = rentangPeriode(periode);
   return ms >= mulai && ms < selesai;
