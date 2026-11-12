@@ -41,6 +41,7 @@ Di luar inti (ditunda): kapasitas penjahit, penagihan piutang.
 | `OWNER` | akun | Lihat semua; atur tarif per model; putuskan kerja ulang; finalkan upah; kelola pengguna |
 | `ADMIN` (admin produksi / mandor) | akun | Buat order; terbitkan versi spesifikasi; catat serah terima, koreksi, dan QC; catat biaya bahan |
 | `PEKERJA` (penjahit/finishing: dalam, borongan, makloon) | akun | Lihat serah terima, QC, dan upah **miliknya sendiri**; konfirmasi atau tolak serah terima yang ditujukan kepadanya |
+| `VENDOR` (pihak luar, mis. sablon) | tidak bisa masuk | Hanya muncul sebagai pemberi/penerima serah terima. Konfirmasinya dicatat admin (4.2) |
 | Pembeli | link bertoken per order, tanpa akun | Lihat status dan perkiraan selesai; lihat dan setujui/minta ubah spesifikasi; (tahap 2) kelola formulir ukuran |
 
 Aturan:
@@ -61,14 +62,17 @@ Tabel catatan (`serah_terima`, `konfirmasi`, `qc`, `spesifikasi_versi`, `persetu
 Satu baris = satu perpindahan barang fisik.
 
 ```
-serah_terima { id, orderId, tahap, dariId, keId, pcs, spekVersiId,
+serah_terima { id, orderId, tahap, arah: KELUAR|SETOR, dariId, keId, pcs, spekVersiId,
                koreksiDariId?, catatan?, dibuatOleh, dibuatPada }
-konfirmasi   { id, serahTerimaId, oleh, hasil: DITERIMA|DITOLAK, alasan?, pada }
+konfirmasi   { id, serahTerimaId, oleh, hasil: DITERIMA|DITOLAK, alasan?, atasNamaVendor, pada }
 ```
 
-- `tahap` ∈ `POTONG, SABLON, JAHIT, FINISHING, KIRIM`.
-- Arah keluar: admin → pekerja/vendor. Arah setor: pekerja/vendor → admin.
+- `tahap` ∈ `POTONG, SABLON, JAHIT, FINISHING` dan harus termasuk `tahapan` order. Tahap `KIRIM` tidak lewat serah terima, melainkan lewat `pengiriman` (4.4).
+- `KELUAR`: admin → pekerja/vendor. `SETOR`: pekerja/vendor → admin.
 - `spekVersiId` = versi spesifikasi yang disetujui terakhir **saat baris dibuat**.
+- Setoran (`SETOR`) **sah sejak dicatat**, karena penerimanya admin yang mencatatnya sendiri. Untuk tahap JAHIT/FINISHING, setoran dan QC dibuat dalam satu langkah atomik.
+- Setoran tidak bisa dikoreksi (sudah terikat QC dan upah). Koreksi hanya untuk baris `KELUAR`.
+- Setoran ditolak bila pcs-nya melebihi pcs yang tercatat masih di tangan pekerja (hanya baris `KELUAR` yang sudah SAH yang dihitung).
 
 Status sebuah serah terima (diturunkan):
 
@@ -80,8 +84,8 @@ SAH / MENUNGGU ──(ada baris lain dengan koreksiDariId = id ini)──→ DIK
 ```
 
 - Hanya baris **SAH** yang dihitung dalam selisih dan upah.
-- Yang mengonfirmasi = **penerima** (`keId`). Untuk arah setor, penerimanya admin; konfirmasinya terjadi lewat pencatatan QC (4.3).
-- Penerima tanpa akun (vendor sablon luar): admin mengonfirmasi sendiri dengan tanda `tanpaKonfirmasiPenerima: true`. Tanda ini terlihat di dashboard owner.
+- Yang mengonfirmasi baris `KELUAR` = **penerima** (`keId`).
+- Penerima `VENDOR` (tanpa akun): admin mengonfirmasi atas namanya, dan baris konfirmasi ditandai `atasNamaVendor: true`. Tanda ini terlihat di dashboard owner.
 - Satu baris hanya bisa dikoreksi satu kali; koreksi atas koreksi menunjuk baris koreksi terakhir (rantai, bukan cabang).
 
 ### 4.3 QC dan penyebab reject
@@ -122,21 +126,30 @@ upah       = Σ pcsDibayar × tarif model order tsb yang berlaku pada tanggal se
 - Untuk tahap FINISHING, penyebab yang mengecualikan upah adalah `FINISHING` (bukan `JAHIT`). Aturan umum: reject tidak dibayar hanya bila penyebabnya **tahap yang dikerjakan pekerja itu sendiri**.
 - Tarif per model berversi (`tarif_versi { modelId, tahap, rupiahPerPcs, berlakuMulai }`); perubahan tarif tidak mengubah upah periode lalu.
 - Periode upah: default 2 mingguan (1–15, 16–akhir bulan). **Hipotesis**, perlu dicek ke klien.
-- Upah periode yang sudah difinalkan owner tidak berubah lagi. Koreksi sesudahnya masuk ke periode berikutnya sebagai baris penyesuaian.
+- Tarif yang belum diatur tidak dianggap Rp 0 diam-diam: baris itu ditandai `tarifKosong`, dan finalisasi ditolak sampai tarifnya diatur.
+- Finalisasi hanya bisa dilakukan **setelah periode berakhir**, sekali per pekerja per periode, dan ditolak bila masih ada serah terima ke pekerja itu di periode tersebut yang belum dikonfirmasi.
+- Upah periode yang sudah difinalkan tidak bisa berubah: semua masukannya bertanggal di periode itu dan tidak bisa diubah (setoran tidak bisa dikoreksi, QC append-only). Setoran baru selalu bertanggal "sekarang", jadi masuk periode berjalan.
 
-Progres order:
-
-```
-lolosQC(O) = Σ lolos QC tahap terakhir yang dipakai order O
-progres    = lolosQC / jumlah order
-```
-
-Peringatan "terancam telat" (**sementara**, rumus asli menunggu data kecepatan produksi klien):
+Progres order dan pengiriman:
 
 ```
-laju      = lolosQC 7 hari terakhir / 7
-butuhHari = (jumlah − lolosQC) / laju      (laju 0 → dianggap tak terhingga)
-TERANCAM jika butuhHari > hari kerja tersisa sebelum deadline
+tahap QC terakhir = FINISHING bila dipakai order, selain itu JAHIT
+lolosQC(O)        = Σ lolos QC tahap QC terakhir order O
+progres           = lolosQC / jumlah order (maks 100%)
+pengiriman { id, orderId, pcs, oleh, pada }   append-only; total dikirim ≤ lolosQC
+```
+
+Peringatan deadline (**sementara**, rumus asli menunggu data kecepatan produksi klien):
+
+```
+jendela   = 7 hari terakhir, tetapi tidak lebih awal dari QC pertama order itu
+laju      = lolosQC dalam jendela / jumlah hari jendela (min 1)
+butuhHari = ceil(sisa / laju)
+status    = SELESAI_PRODUKSI  bila sisa ≤ 0
+            TERLAMBAT         bila deadline sudah lewat
+            BELUM_ADA_DATA    bila belum ada QC sama sekali (sistem tidak mengklaim aman)
+            TERANCAM          bila laju 0 atau butuhHari > hari kalender tersisa
+            AMAN              selain itu
 ```
 
 Margin order (tahap 2): `harga jual × jumlah − Σ biaya_bahan − Σ upah atas order itu`.
@@ -149,10 +162,11 @@ spesifikasi_versi { id, orderId, nomor, isi: {model, bahan, warna, logo, ukuran,
 persetujuan_spek  { id, spekVersiId, hasil: DISETUJUI|MINTA_UBAH, catatanPembeli?, pada }
 ```
 
-- Versi tidak pernah diubah. Perubahan = versi baru (`nomor + 1`) dengan daftar field yang berubah.
+- Versi tidak pernah diubah. Perubahan = versi baru (`nomor + 1`). Daftar field yang berubah **dihitung server** dari versi sebelumnya; versi baru tanpa perubahan ditolak.
+- `isi.ukuran` = rincian per ukuran (`{ S: 10, M: 30, ... }`), dan totalnya wajib sama dengan jumlah order.
 - Produksi mengikuti **versi disetujui terakhir**. Versi baru yang belum disetujui tidak menghentikan produksi.
 - Persetujuan hanya untuk versi terbaru; versi lama tidak bisa disetujui lagi.
-- Pcs yang dikerjakan ulang karena perubahan spesifikasi dicatat sebagai `kerja_ulang { orderId, pekerjaId, pcs, spekVersiId, alasan }`, lalu owner memutuskan `keputusan_kerja_ulang { BAYAR|TIDAK, tagihKePembeli: bool }`.
+- Pcs yang dikerjakan ulang karena perubahan spesifikasi dicatat sebagai `kerja_ulang { orderId, pekerjaId, tahap, pcs, spekVersiId, alasan }`, lalu owner memutuskan sekali `keputusan_kerja_ulang { bayar: bool, tagihKePembeli: bool }`. Bila dibayar, pcs-nya masuk upah di periode tanggal keputusan.
 
 ### 4.6 Link pembeli
 
@@ -168,7 +182,8 @@ persetujuan_spek  { id, spekVersiId, hasil: DISETUJUI|MINTA_UBAH, catatanPembeli
 | `pengguna` | id, nama, peran, status, dibuatPada | |
 | `model_produk` | id, nama | contoh: kaos, kemeja PDH |
 | `tarif_versi` | modelId, tahap, rupiahPerPcs, berlakuMulai | append-only |
-| `order` | id, kode, pembeli, modelId, jumlah, hargaPerPcs, deadline, dibuatPada | |
+| `order` | id, kode, pembeli, modelId, jumlah, hargaPerPcs, deadline, tahapan, dibuatPada | `tahapan` wajib memuat POTONG, JAHIT, KIRIM |
+| `pengiriman` | orderId, pcs, oleh, pada | append-only |
 | `spesifikasi_versi`, `persetujuan_spek` | lihat 4.5 | append-only |
 | `serah_terima`, `konfirmasi` | lihat 4.2 | append-only |
 | `qc` | lihat 4.3 | append-only |
@@ -196,14 +211,15 @@ gagal  : { "error": { "kode": "VALIDASI|TIDAK_BOLEH|TIDAK_DITEMUKAN|KONFLIK|TIDA
 | GET | `/order` | OWNER, ADMIN | daftar order + progres + status deadline |
 | POST | `/order` | ADMIN | buat order + spesifikasi versi 1 + link pembeli |
 | GET | `/order/:id` | OWNER, ADMIN | detail, ringkasan per tahap, jejak serah terima |
-| POST | `/order/:id/spesifikasi` | ADMIN | terbitkan versi baru; `perubahan` wajib tidak kosong |
+| POST | `/order/:id/spesifikasi` | ADMIN | terbitkan versi baru; ditolak bila tidak ada field yang berubah |
+| POST | `/order/:id/pengiriman` | ADMIN | `{pcs}`; total dikirim ≤ lolos QC |
 | POST | `/serah-terima` | ADMIN | `{orderId, tahap, dariId, keId, pcs}`; pcs bulat > 0; status awal MENUNGGU |
 | POST | `/serah-terima/:id/koreksi` | ADMIN | `{pcs, alasan}`; hanya untuk baris MENUNGGU/DITOLAK/SAH yang belum dikoreksi |
 | POST | `/serah-terima/:id/konfirmasi` | PEKERJA penerima | `{hasil, alasan?}`; hanya baris MENUNGGU yang `keId` = dirinya; `alasan` wajib bila DITOLAK |
 | POST | `/setoran` | ADMIN | setor + QC sekaligus: `{orderId, tahap, dariId, lolos, reject:[{penyebab,pcs}]}`; tolak bila setor membuat disetor > diterima |
 | GET | `/selisih` | OWNER (semua), PEKERJA (miliknya) | selisih per pekerja/order/tahap |
 | GET | `/upah?periode=` | OWNER (semua), PEKERJA (miliknya) | rincian per setoran |
-| POST | `/upah/:periode/finalisasi` | OWNER | `{pekerjaId}`; tolak bila masih ada serah terima MENUNGGU milik pekerja itu di periode tsb |
+| POST | `/upah/:periode/finalisasi` | OWNER | `{pekerjaId}`; tolak bila periode belum selesai, sudah difinalkan, ada tarif kosong, atau masih ada serah terima MENUNGGU milik pekerja itu di periode tsb |
 | POST | `/kerja-ulang` | ADMIN | lihat 4.5 |
 | POST | `/kerja-ulang/:id/keputusan` | OWNER | `{bayar, tagihKePembeli}`; sekali saja |
 | POST | `/tarif` | OWNER | versi tarif baru |
@@ -311,7 +327,7 @@ src/
 
 ### 11.5 Urutan pengerjaan
 
-1. `logika/` + tes (status serah terima, selisih, upah, progres, deadline, wewenang).
+1. ✅ `logika/` + tes (status serah terima, selisih, upah, progres, deadline, wewenang, spesifikasi, order).
 2. Mock API + tes kontrak per endpoint.
 3. Halaman admin (sumber data semua halaman lain).
 4. Halaman pekerja.

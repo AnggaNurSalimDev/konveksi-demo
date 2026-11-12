@@ -1,0 +1,16 @@
+{
+  "name": "konveksi-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Demo sistem lacak produksi konveksi: serah terima dua pihak, QC, selisih, upah borongan",
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.9"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
